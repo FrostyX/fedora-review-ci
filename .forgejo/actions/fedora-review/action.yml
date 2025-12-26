@@ -19,9 +19,11 @@ runs:
   steps:
     - name: Install dependencies
       run: dnf -y install rpmbuild fedora-review jq
+      shell: bash
 
     - name: Create a tmp directory
       run: mkdir /tmp/fedora-review
+      shell: bash
 
     # In the future we will probably download the spec, SRPM and RPM files
     # from Koji scratch build, which would be a pre-requisite workflow
@@ -29,6 +31,7 @@ runs:
     - name: Copy spec to the tmp directory
       # run: cp hello.spec /tmp/fedora-review
       run: cp ${{ inputs.spec }} /tmp/fedora-review
+      shell: bash
 
     # Use fedpkg once we are in the DistGit
     - name: Build SRPM from the spec file
@@ -38,6 +41,7 @@ runs:
         -D "%_sourcedir /tmp/fedora-review"
         -D "%_specdir /tmp/fedora-review"
         -D "%_srcrpmdir /tmp/fedora-review"
+      shell: bash
 
     # TODO Implement fedora-review -X for skipping whole sections/groups of checks
     - name: Run fedora-review
@@ -45,6 +49,7 @@ runs:
         fedora-review -n ${{ inputs.name }}
         -x CheckNoNameConflict
       # run: fedora-review -b 2158000
+      shell: bash
       working-directory: /tmp/fedora-review
       env:
         REVIEW_NO_MOCKGROUP_CHECK: true
@@ -62,10 +67,13 @@ runs:
     - name: Count failed MUST items
       id: count_must_items
       run: cat /tmp/fedora-review/review-${{ inputs.name }}/review.json |jq '[.results.MUST.Generic[] | select(.result == "fail")] |length' |awk '{OFS=""; print "count=", $0 }' >> $GITHUB_OUTPUT
+      shell: bash
 
     - name: Print failed checks
       if: steps.count_must_items.outputs.count != 0
       run: cat /tmp/fedora-review/review-${{ inputs.name }}/review.json |jq '[.results.MUST.Generic[] | select(.result == "fail")]'
+      shell: bash
 
     - name: Make sure no check failed
       run: test "${{ steps.count_must_items.outputs.count }}" -eq 0
+      shell: bash
