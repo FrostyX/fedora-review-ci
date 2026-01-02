@@ -26,10 +26,11 @@ runs:
       shell: bash
 
     # In the future we will probably download the spec, SRPM and RPM files
-    # from Koji scratch build, which would be a pre-requisite workflow
+    # from Koji scratch build, which would be a pre-requisite workflow.
+    # That way we will avoid wasting resources and make this action much faster
+    # for large packages.
 
     - name: Copy spec to the tmp directory
-      # run: cp hello.spec /tmp/fedora-review
       run: cp ${{ inputs.spec }} /tmp/fedora-review
       shell: bash
 
@@ -44,36 +45,33 @@ runs:
       shell: bash
 
     # TODO Implement fedora-review -X for skipping whole sections/groups of checks
+    # https://pagure.io/FedoraReview/pull-request/542
+    # Then we will skip SHOULD and EXTRA sections
+    # We want this only for performance reasons, it's not a hard requirement.
+    # We already filter out the unwanted section when parsing `review.json`.
     - name: Run fedora-review
       run: >
         fedora-review -n ${{ inputs.name }}
         -x CheckNoNameConflict
-      # run: fedora-review -b 2158000
       shell: bash
       working-directory: /tmp/fedora-review
       env:
         REVIEW_NO_MOCKGROUP_CHECK: true
-      # TODO Remove this
-      # continue-on-error: true
 
-    # # TODO Remove this
-    # - name: DEBUG
-    #   # run: cat /root/.cache/fedora-review.log
-    #   run: find /tmp/fedora-review
-
-
-    # TODO Work with all MUST not only Generic
-
+    # TODO Work with all MUST subsections, not only Generic
     - name: Count failed MUST items
       id: count_must_items
       run: cat /tmp/fedora-review/review-${{ inputs.name }}/review.json |jq '[.results.MUST.Generic[] | select(.result == "fail")] |length' |awk '{OFS=""; print "count=", $0 }' >> $GITHUB_OUTPUT
       shell: bash
 
+    # TODO Work with all MUST subsections, not only Generic
+    # TODO Show these in the Web UI as this is the most important output for the user
     - name: Print failed checks
       if: steps.count_must_items.outputs.count != 0
       run: cat /tmp/fedora-review/review-${{ inputs.name }}/review.json |jq '[.results.MUST.Generic[] | select(.result == "fail")]'
       shell: bash
 
+    # TODO Show a user friendly message
     - name: Make sure no check failed
       run: test "${{ steps.count_must_items.outputs.count }}" -eq 0
       shell: bash
